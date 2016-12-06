@@ -69,4 +69,8 @@ public class TrainingData implements Iterable<County>{
     public Iterator<County> iterator() {
         return counties.iterator();
     }
+
+    public int size() {
+        return counties.size();
+    }
 }

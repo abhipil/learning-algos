@@ -12,29 +12,57 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.Queue;
+import java.util.Random;
 
-public class KNN {
-
+/**
+ * @author abhishek
+ *         created on 12/6/16.
+ */
+public class Perceptron {
+    private static final int EPOCH = 200;
     private final String trainingDataPath;
-    private final String testingDataPath;
-    private final int K;
 
     private TrainingData trainingData;
+
+    private Random rand = new Random();
+    private double[] weights = new double[9];
+    private double theta;
+    private double l_rate;
 
     public static void main(String[] args) {
         Path train = FileSystems.getDefault().getPath("classification-data", "votes-train.csv");
         Path test = FileSystems.getDefault().getPath("classification-data", "votes-test.csv");
-        new KNN(train.toString(), test.toString(), 20).find();
+        Perceptron perceptron = new Perceptron(train.toString(), 0.2,0.1d);
+        perceptron.train();
+        perceptron.percept(test.toString());
     }
-    public KNN(String trainingDataPath, String testingDataPath, int k) {
+    public Perceptron(String trainingDataPath, double theta, double l_rate) {
         this.trainingDataPath = trainingDataPath;
-        this.testingDataPath = testingDataPath;
-        K = k;
         trainingData = new TrainingData(readRecordsFromFile(trainingDataPath));
+        for (int i = 0; i < weights.length; i++) {
+            weights[i] = rand.nextDouble();
+        }
+        this.theta = theta;
+        this.l_rate = l_rate;
     }
 
-    public void find() {
+    public void train() {
+        int error = -1, iterations = 0;
+        while(error!=0 || iterations>EPOCH) {
+            error=0;
+            for (County county : trainingData) {
+                int prediction = predict(county);
+                int iter_error = county.votedFor - prediction;
+                for (int i = 0; i < weights.length; i++) {
+                    weights[i] += l_rate * iter_error * county.values[i];
+                }
+                error += (iter_error * iter_error);
+            }
+            iterations++;
+        }
+    }
+
+    public void percept(String testingDataPath) {
         int correct=0;
         int total=0;
         for ( String[] string : readRecordsFromFile(testingDataPath)) {
@@ -42,24 +70,7 @@ public class KNN {
             if (test==null) {
                 continue;
             }
-            PriorityQueue<County> neighbours = new PriorityQueue<>(K, new Comparator<County>() {
-                @Override
-                public int compare(County o1, County o2) {
-                    return Double.compare(o1.distance, o2.distance);
-                }
-            });
-            for (County county: trainingData) {
-                county.distance = county.cosineDistanceFrom(test);
-                if (neighbours.size() == K) {
-                    if(neighbours.peek().distance > county.distance){
-                        neighbours.poll();
-                        neighbours.add(county);
-                    }
-                } else if (neighbours.size()<K){
-                    neighbours.add(county);
-                }
-            }
-            if (test.votedFor==classify(neighbours)) {
+            if (test.votedFor == predict(test)) {
                 correct++;
             }
             total++;
@@ -67,21 +78,16 @@ public class KNN {
         System.out.println("Accuracy: "+(correct*100)/total);
     }
 
-    private int classify(Queue<County> neighbours) {
-        int votedFor=0;
-        for (County county : neighbours) {
-            if(county.votedFor==1){
-                votedFor+=1;
-            }
+    private int predict(County county) {
+        double sum = 0;
+        for (int i = 0; i < weights.length; i++) {
+            sum += weights[i]*county.values[i];
         }
-        if (votedFor>neighbours.size()/2) {
-            return 1;
-        }
-        return 0;
+        return (sum>=theta) ? 1:0;
     }
 
     public List<String[]> readRecordsFromFile(String filePath) {
-        CSVReader reader;
+        CSVReader reader = null;
         try {
             reader = new CSVReader(new FileReader(filePath));
         } catch (FileNotFoundException e) {

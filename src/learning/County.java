@@ -9,7 +9,7 @@ import java.util.Comparator;
 
 public class County {
     public int votedFor;
-    double[] values;
+    public double[] values;
 
     public double distance;
 
